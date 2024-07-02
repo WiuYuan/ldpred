@@ -102,6 +102,7 @@ def ldpred2_gibbs_auto(PM, beta_hat, N, M, para):
     h2_per_var = h2 / (M * p)
     inv_odd_p = (1 - p) / p
     for k in range(-para["burn_in"], para["num_iter"]):
+        print(k, h2, p)
         for j in range(m):
             res_beta_hat_j = beta_hat[j] - (dotprods[j] - curr_beta[j])
             # res_beta_hat_j = beta_hat[j] - dotprods[j]
@@ -141,7 +142,7 @@ def ldpred2_auto(PM, sumstats, para):
 
     for k in range(-para["burn_in"], para["num_iter"]):
         Mc = 0
-        # print(k, h2, p)
+        print(k, h2, p)
         h2_per_var = h2 / (M * p)
         inv_odd_p = (1 - p) / p
         h2 = 0
