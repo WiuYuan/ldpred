@@ -74,7 +74,7 @@ def merge_vcf_fam(vcfstats, famstats):
     return phestats
 
 
-def fliter_by_vcf(beta, snplist, phestats):
+def fliter_by_vcf(beta_list, snplist, phestats):
     phestats_total = {}
     rsid_total = []
     rsid_phestats = {value: index for index, value in enumerate(phestats["rsid"])}
@@ -90,7 +90,8 @@ def fliter_by_vcf(beta, snplist, phestats):
         for key in list(snplist[i].keys()):
             if isinstance(snplist[i][key], list):
                 snplist[i][key] = np.array(snplist[i][key])[rsid].tolist()
-        beta[i] = np.array(beta[i])[rsid].tolist()
+        for beta in beta_list:
+            beta[i] = np.array(beta[i])[rsid].tolist()
         rsid_snplist_block = {
             value: index for index, value in enumerate(snplist[i]["rsid"])
         }
