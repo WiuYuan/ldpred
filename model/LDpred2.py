@@ -46,8 +46,8 @@ def ldpred2_gibbs_one_sampling(PM, beta_hat, N, M, para):
     inv_odd_p = (1 - p) / p
     for k in range(-para["burn_in"], para["num_iter"]):
         for j in range(m):
-            # res_beta_hat_j = beta_hat[j] - (dotprods[j] - curr_beta[j])
-            res_beta_hat_j = beta_hat[j] - dotprods[j]
+            res_beta_hat_j = beta_hat[j] - (dotprods[j] - curr_beta[j])
+            # res_beta_hat_j = beta_hat[j] - dotprods[j]
             C1 = h2_per_var * N[j]
             C2 = 1 / (1 + 1 / C1)
             C3 = C2 * res_beta_hat_j
@@ -63,8 +63,8 @@ def ldpred2_gibbs_one_sampling(PM, beta_hat, N, M, para):
                 curr_beta[j] = 0
             if k >= 0:
                 avg_beta[j] += C3 * post_p_j
-        if diff != 0:
-            dotprods += LD[:, j].toarray().flatten() * diff
+            if diff != 0:
+                dotprods += LD[:, j].toarray().flatten() * diff
     return avg_beta / para["num_iter"]
 
 
