@@ -32,3 +32,9 @@ def generate_sumstats_beta(PM, snplist, para):
         sumstats.append(sumstats_block)
 
     return sumstats, beta_true
+
+
+def generate_phenotype(phestats, beta, para):
+    phestats["Phenotype"] = phestats["X"] @ beta + np.random.randn(
+        len(phestats["Phenotype"])
+    ) * np.sqrt(1 - para["h2"])

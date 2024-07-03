@@ -89,6 +89,31 @@ def sumstats_read(sumstats_path):
     return sumstats
 
 
+# def sumstats_read(sumstats_path):
+#     sumstats = {}
+#     sumstats["ALT"] = []
+#     with open(sumstats_path, "r") as file:
+#         tot = 0
+#         for line in file:
+#             line_list = line.strip().split("\t")
+#             if tot == 0:
+#                 title_list = line_list
+#                 for i in range(len(title_list)):
+#                     sumstats[title_list[i]] = []
+#             else:
+#                 for i in range(len(title_list)):
+#                     sumstats[title_list[i]].append(line_list[i])
+#                 if sumstats["A1"][tot - 1] == sumstats["REF"][tot - 1]:
+#                     sumstats["ALT"].append(sumstats["A2"][tot - 1])
+#                 else:
+#                     sumstats["ALT"].append(sumstats["A1"][tot - 1])
+#             tot = tot + 1
+#     sumstats["rsid"] = sumstats.pop("SNP")
+#     sumstats["beta"] = sumstats.pop("Beta")
+#     sumstats["beta_se"] = sumstats.pop("se")
+#     return sumstats
+
+
 def vcf_read(vcf_path):
     vcfstats = {}
     with open(vcf_path, "r") as file:
