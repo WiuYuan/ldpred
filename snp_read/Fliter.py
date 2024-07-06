@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.sparse.linalg import inv, splu
 from scipy.sparse import csr_matrix
+from operator import itemgetter
+import multiprocessing
 
 
 def filter_by_PM(PM, snplist):
@@ -10,12 +12,56 @@ def filter_by_PM(PM, snplist):
         for key in list(snplist[i].keys()):
             if isinstance(snplist[i][key], list):
                 snplist[i][key] = np.array(snplist[i][key])[PMid].tolist()
+        if i % 30 == 0:
+            print("Fliter_by_PM block:", i)
+        snplist[i]["index"] = np.arange(len(snplist[i]["rsid"])).tolist()
 
 
 def normalize_dense_matrix(A):
     diag_elements = np.diag(A)
     sqrt_diag_outer = np.sqrt(np.outer(diag_elements, diag_elements))
     return A / sqrt_diag_outer
+
+
+def fliter_by_sumstats_subprocess(subinput):
+    rsid_sumstats, snplist_rsid, i = subinput
+    rsid1 = [
+        index for index, value in enumerate(snplist_rsid) if value in rsid_sumstats
+    ]
+    rsid2 = [
+        rsid_sumstats[value]
+        for index, value in enumerate(snplist_rsid)
+        if value in rsid_sumstats
+    ]
+    print("Fliter_by_sumstats parallel block:", i)
+    return rsid1, rsid2
+
+
+def fliter_by_sumstats_parallel(PM, snplist, sumstats):
+    sumstats_set = []
+    rsid_sumstats = {value: index for index, value in enumerate(sumstats["rsid"])}
+    num_processes = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=num_processes)
+    subinput = []
+    for i in range(len(PM)):
+        subinput.append((rsid_sumstats, snplist[i]["rsid"], i))
+    for key in list(sumstats.keys()):
+        if isinstance(sumstats[key], list):
+            sumstats[key] = np.array(sumstats[key])
+    results = pool.map(fliter_by_sumstats_subprocess, subinput)
+    for i in range(len(PM)):
+        rsid1, rsid2 = results[i]
+        print(rsid1, rsid2)
+        for key in list(snplist[i].keys()):
+            if isinstance(snplist[i][key], list):
+                snplist[i][key] = np.array(snplist[i][key])[rsid1].tolist()
+        sumstats_block = {}
+        for key in list(sumstats.keys()):
+            if isinstance(sumstats[key], np.ndarray):
+                sumstats_block[key] = sumstats[key][rsid2].tolist()
+        sumstats_set.append(sumstats_block)
+        print("Fliter_by_sumstats results block:", i)
+    return sumstats_set
 
 
 def fliter_by_sumstats(PM, snplist, sumstats):
@@ -27,30 +73,28 @@ def fliter_by_sumstats(PM, snplist, sumstats):
             for index, value in enumerate(snplist[i]["rsid"])
             if value in rsid_sumstats
         ]
-        I_dense = np.eye(PM[i]["precision"].shape[0])
-        PM[i]["LD"] = csr_matrix(
-            normalize_dense_matrix(
-                splu(PM[i]["precision"]).solve(I_dense[:, rsid])[rsid]
-            )
-        )
-        PM[i]["precision"] = PM[i]["precision"][rsid][:, rsid]
+        # I_dense = np.eye(PM[i]["precision"].shape[0])
+        # PM[i]["LD"] = csr_matrix(
+        #     normalize_dense_matrix(
+        #         splu(PM[i]["precision"]).solve(I_dense[:, rsid])[rsid]
+        #     )
+        # )
+        # PM[i]["precision"] = PM[i]["precision"][rsid][:, rsid]
         # PM[i]["LD"] = PM[i]["LD"][rsid][:, rsid]
         for key in list(snplist[i].keys()):
             if isinstance(snplist[i][key], list):
                 snplist[i][key] = np.array(snplist[i][key])[rsid].tolist()
-        rsid_snplist_block = {
-            value: index for index, value in enumerate(snplist[i]["rsid"])
-        }
         rsid = [
-            index
-            for index, value in enumerate(sumstats["rsid"])
-            if value in rsid_snplist_block
+            rsid_sumstats[value]
+            for index, value in enumerate(snplist[i]["rsid"])
+            if value in rsid_sumstats
         ]
         sumstats_block = {}
         for key in list(sumstats.keys()):
             if isinstance(sumstats[key], list):
                 sumstats_block[key] = np.array(sumstats[key])[rsid].tolist()
         sumstats_set.append(sumstats_block)
+        print("Fliter_by_sumstats block:", i)
     return sumstats_set
 
 

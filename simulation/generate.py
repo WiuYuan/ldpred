@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 
 
 def generate_sumstats_beta(PM, snplist, para):
@@ -38,3 +39,42 @@ def generate_phenotype(phestats, beta, para):
     phestats["Phenotype"] = phestats["X"] @ beta + np.random.randn(
         len(phestats["Phenotype"])
     ) * np.sqrt(1 - para["h2"])
+
+
+def generate_PM_snplist(para):
+    snplist = []
+    PM = []
+    si = 0
+    for i in range(para["block_num"]):
+        snplist_block = {}
+        PM_block = {}
+        n = para["block_size"]
+        snplist_block["rsid"] = ["rs{}".format(i) for i in range(si, si + n)]
+        si += n
+        N = para["PM_size"]
+        snplist_block["index"] = np.arange(N)
+        M = np.random.rand(N, N) - 0.5
+        R = np.dot(M, M.T)
+        D = np.sqrt(np.diag(R))
+        PM_block["LD"] = R / np.outer(D, D)
+        PM_block["precision"] = csr_matrix(np.linalg.inv(PM_block["LD"]))
+        PM_block["LD"] = csr_matrix(PM_block["LD"])
+        snplist.append(snplist_block)
+        PM.append(PM_block)
+        # print(PM_block["precision"].toarray())
+    return PM, snplist
+
+
+def get_para():
+    para = {}
+    para["h2"] = 0.3
+    para["p"] = 0.018
+    para["block_size"] = 100
+    para["PM_size"] = 100
+    para["block_num"] = 10
+    para["burn_in"] = 50
+    para["num_iter"] = 100
+    para["N"] = 15155
+    para["ldgm_burn_in"] = 50
+    para["ldgm_num_iter"] = 100
+    return para

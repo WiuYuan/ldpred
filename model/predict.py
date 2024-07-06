@@ -2,10 +2,15 @@ from scipy.stats import linregress
 import numpy as np
 
 
-def check_r_squared(phestats, beta):
+def check_r_squared_phe(phestats, beta):
     y = phestats["Phenotype"].astype(float)
     x = phestats["X"] @ beta
     slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    return r_value**2
+
+
+def check_r_squared_beta(beta1, beta2):
+    slope, intercept, r_value, p_value, std_err = linregress(beta1, beta2)
     return r_value**2
 
 

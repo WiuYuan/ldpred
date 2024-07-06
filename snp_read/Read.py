@@ -39,6 +39,7 @@ def snplist_read(snplist_folder_path):
         snplist_block["REF"] = snplist_block.pop("anc_alleles")
         snplist_block["ALT"] = snplist_block.pop("deriv_alleles")
         snplist.append(snplist_block)
+        print("Read snplist file:", snplist_file)
     return snplist
 
 
@@ -67,35 +68,16 @@ def PM_read(precision_folder_path):
         PM_block["precision"] = csr_matrix((data, (rows, cols)))
         PM_block["filename"] = PM_file
         PM.append(PM_block)
+        print("Read Precision matrix file:", PM_file)
     return PM
-
-
-def sumstats_read(sumstats_path):
-    sumstats = {}
-    with open(sumstats_path, "r") as file:
-        tot = 0
-        for line in file:
-            line_list = line.strip().split(",")
-            if tot == 0:
-                title_list = line_list
-                for i in range(len(title_list)):
-                    sumstats[title_list[i]] = []
-            else:
-                for i in range(len(title_list)):
-                    sumstats[title_list[i]].append(line_list[i])
-            tot = tot + 1
-    sumstats["REF"] = sumstats.pop("a0")
-    sumstats["ALT"] = sumstats.pop("a1")
-    return sumstats
 
 
 # def sumstats_read(sumstats_path):
 #     sumstats = {}
-#     sumstats["ALT"] = []
 #     with open(sumstats_path, "r") as file:
 #         tot = 0
 #         for line in file:
-#             line_list = line.strip().split("\t")
+#             line_list = line.strip().split(",")
 #             if tot == 0:
 #                 title_list = line_list
 #                 for i in range(len(title_list)):
@@ -103,15 +85,37 @@ def sumstats_read(sumstats_path):
 #             else:
 #                 for i in range(len(title_list)):
 #                     sumstats[title_list[i]].append(line_list[i])
-#                 if sumstats["A1"][tot - 1] == sumstats["REF"][tot - 1]:
-#                     sumstats["ALT"].append(sumstats["A2"][tot - 1])
-#                 else:
-#                     sumstats["ALT"].append(sumstats["A1"][tot - 1])
 #             tot = tot + 1
-#     sumstats["rsid"] = sumstats.pop("SNP")
-#     sumstats["beta"] = sumstats.pop("Beta")
-#     sumstats["beta_se"] = sumstats.pop("se")
+#     sumstats["REF"] = sumstats.pop("a0")
+#     sumstats["ALT"] = sumstats.pop("a1")
 #     return sumstats
+
+
+def sumstats_read(sumstats_path):
+    sumstats = {}
+    sumstats["ALT"] = []
+    with open(sumstats_path, "r") as file:
+        tot = 0
+        for line in file:
+            line_list = line.strip().split("\t")
+            if tot == 0:
+                title_list = line_list
+                for i in range(len(title_list)):
+                    sumstats[title_list[i]] = []
+            else:
+                for i in range(len(title_list)):
+                    sumstats[title_list[i]].append(line_list[i])
+                if sumstats["A1"][tot - 1] == sumstats["REF"][tot - 1]:
+                    sumstats["ALT"].append(sumstats["A2"][tot - 1])
+                else:
+                    sumstats["ALT"].append(sumstats["A1"][tot - 1])
+            tot = tot + 1
+            if tot % 100000 == 0:
+                print("Read sumstats line:", tot)
+    sumstats["rsid"] = sumstats.pop("SNP")
+    sumstats["beta"] = sumstats.pop("Beta")
+    sumstats["beta_se"] = sumstats.pop("se")
+    return sumstats
 
 
 def vcf_read(vcf_path):
