@@ -1,7 +1,5 @@
 import numpy as np
-from scipy.sparse.linalg import inv, splu
-from scipy.sparse import csr_matrix
-from operator import itemgetter
+import scipy.sparse as sp
 import multiprocessing
 
 
@@ -15,6 +13,24 @@ def filter_by_PM(PM, snplist):
         if i % 30 == 0:
             print("Fliter_by_PM block:", i)
         snplist[i]["index"] = np.arange(len(snplist[i]["rsid"])).tolist()
+
+
+def normalize_PM_subprocess(subinput):
+    P, i = subinput
+    print("normalize_PM_subprocess block:", i)
+    D = np.sqrt(sp.linalg.inv(P.tocsc()).diagonal())
+    return P.multiply(np.outer(D, D)).tocsr()
+
+
+def normalize_PM(PM):
+    num_processes = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=num_processes)
+    subinput = []
+    for i in range(len(PM)):
+        subinput.append((PM[i]["precision"], i))
+    results = pool.map(normalize_PM_subprocess, subinput)
+    for i in range(len(PM)):
+        PM[i]["precision"] = results[i]
 
 
 def normalize_dense_matrix(A):
@@ -51,7 +67,6 @@ def fliter_by_sumstats_parallel(PM, snplist, sumstats):
     results = pool.map(fliter_by_sumstats_subprocess, subinput)
     for i in range(len(PM)):
         rsid1, rsid2 = results[i]
-        print(rsid1, rsid2)
         for key in list(snplist[i].keys()):
             if isinstance(snplist[i][key], list):
                 snplist[i][key] = np.array(snplist[i][key])[rsid1].tolist()

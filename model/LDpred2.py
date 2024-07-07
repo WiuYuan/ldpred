@@ -105,7 +105,7 @@ def ldpred2_auto(PM, sumstats, para):
 
     for k in range(-para["burn_in"], para["num_iter"]):
         Mc = 0
-        print(k, h2, p)
+        print("step:", k, "p:", p, "h2:", h2)
         h2_per_var = h2 / (M * p)
         inv_odd_p = (1 - p) / p
         h2 = 0

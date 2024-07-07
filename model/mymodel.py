@@ -252,14 +252,12 @@ def ldgm_gibbs_block_auto(PM, snplist, sumstats, para):
                     snplist[i]["index"],
                 )
                 curr_beta[i][idn0] = np.random.randn(len(idn0))
-                x1 = ldgm_R_times(P, curr_beta[i][idn0], Pidn0)
-                x2 = ldgm_R_times(P, x1, Pidn0)
+                x1 = ldgm_R_times(P, curr_beta[i][idn0], Pidn0) * C1
+                x2 = ldgm_R_times(P, x1, Pidn0) * C1
                 # x2 = np.zeros(len(idn0))
-                x3 = ldgm_R_times(P, x2, id0, idn0)
+                x3 = ldgm_R_times(P, x2, id0, idn0) * C1
                 # x3 = np.zeros(len(idn0))
-                curr_beta[i][idn0] = (
-                    curr_beta[i][idn0] - x1 * C1 / 2 - x2 * C1**2 / 8 - x3 * C1**3 / 16
-                )
+                curr_beta[i][idn0] = curr_beta[i][idn0] - x1 / 2 - x2 / 8 - x3 / 16
                 curr_beta[i][idn0] *= np.sqrt(h2_per_var)
                 curr_beta[i][idn0] += mean[idn0]
             curr_beta[i][id0] = 0
@@ -304,6 +302,7 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
     id0 = np.where(q == 0)[0]
     idn0 = np.where(q != 0)[0]
     Pidn0 = snplist["index"][idn0]
+    mean_beta = np.zeros(m)
     if len(Pidn0) != 0:
         a = 1 / (h2_per_var * para["N"])
         P = PM["precision"].copy()
@@ -324,9 +323,10 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
         curr_beta[idn0] = curr_beta[idn0] - x1 / (2 * a) - x2 / (8 * a) - x3 / (16 * a)
         curr_beta[idn0] *= np.sqrt(h2_per_var)
         curr_beta[idn0] += mean[idn0]
+        mean_beta[idn0] = mean[idn0]
     curr_beta[id0] = 0
     R_curr_beta = ldgm_R_times(PM["precision"], curr_beta, snplist["index"])
-    return curr_beta, R_curr_beta, len(idn0), np.dot(curr_beta, R_curr_beta)
+    return curr_beta, R_curr_beta, len(idn0), np.dot(curr_beta, R_curr_beta), mean_beta
 
 
 def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
@@ -354,7 +354,9 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
         avg_beta.append(np.zeros(m))
         snplist[i]["index"] = np.array(snplist[i]["index"])
     for k in range(-para["ldgm_burn_in"], para["ldgm_num_iter"]):
-        print(k, p, h2)
+        print("step:", k, "p:", p, "h2:", h2)
+        h2 = max(h2, para["h2_min"])
+        h2 = min(h2, para["h2_max"])
         Mc = 0
         h2_per_var = h2 / (M * p)
         inv_odd_p = (1 - p) / p
@@ -378,11 +380,11 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
             )
         results = pool.map(ldgm_gibbs_block_auto_parallel_subprocess, subinput)
         for i in range(len(PM)):
-            curr_beta[i], R_curr_beta[i], Mc_add, h2_add = results[i]
+            curr_beta[i], R_curr_beta[i], Mc_add, h2_add, mean_beta = results[i]
             Mc += Mc_add
             h2 += h2_add
             if k >= 0:
-                avg_beta[i] += curr_beta[i]
+                avg_beta[i] += mean_beta
         p = np.random.beta(1 + Mc, 1 + M - Mc)
     for i in range(len(PM)):
         beta_ldgm.append(avg_beta[i] / para["ldgm_num_iter"])

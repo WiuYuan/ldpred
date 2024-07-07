@@ -1,6 +1,8 @@
 import LDpred as ld
+import time
 
 if __name__ == "__main__":
+    start_time = time.time()
     pwd = "/Users/yuanwen/Desktop/Docker_Environment/intern/1"
     output_path = pwd + "/data/sumstats/output.sumstats"
     para = ld.generate.get_para()
@@ -13,12 +15,15 @@ if __name__ == "__main__":
     beta_auto_total = ld.Fliter.merge_beta(beta_auto)
     beta_inf = ld.LDpred2.ldpred2_inf(PM, sumstats, para)
     beta_inf_total = ld.Fliter.merge_beta(beta_inf)
-    ld.Write.sumstats_beta_write(sumstats, beta_ldgm, output_path)
     print(
         "inf r2:",
         ld.predict.check_r_squared_beta(beta_inf_total, beta_true_total),
-        "ldgmsuto r2:",
+        "ldgm_auto r2:",
         ld.predict.check_r_squared_beta(beta_ldgm_total, beta_true_total),
         "auto r2:",
         ld.predict.check_r_squared_beta(beta_auto_total, beta_true_total),
+    )
+    end_time = time.time()
+    ld.Write.sumstats_beta_write(
+        sumstats, beta_ldgm, output_path, end_time - start_time
     )

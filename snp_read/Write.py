@@ -1,6 +1,7 @@
-def sumstats_beta_write(sumstats, beta, output_path):
+def sumstats_beta_write(sumstats, beta, output_path, run_time):
     output_key = ["rsid", "CHR", "POS", "REF", "ALT", "beta", "beta_se", "P", "N"]
     with open(output_path, "w") as f:
+        f.write(f"## Running time: {run_time:.4f} seconds\n")
         f.write("\t".join(output_key))
         f.write("\tbeta_joint\n")
         for i in range(len(sumstats)):
