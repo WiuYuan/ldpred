@@ -254,7 +254,7 @@ def ldgm_gibbs_block_auto(PM, snplist, sumstats, para):
                 curr_beta[i][idn0] = np.random.randn(len(idn0))
                 x1 = ldgm_R_times(P, curr_beta[i][idn0], Pidn0) * C1
                 x2 = ldgm_R_times(P, x1, Pidn0) * C1
-                x2 = np.zeros(len(idn0))
+                # x2 = np.zeros(len(idn0))
                 x3 = ldgm_R_times(P, x2, id0, idn0) * C1
                 # x3 = np.zeros(len(idn0))
                 curr_beta[i][idn0] = curr_beta[i][idn0] - x1 / 2 - x2 / 8 - x3 / 16
