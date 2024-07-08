@@ -2,178 +2,7 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.sparse.linalg import splu
 import scipy.sparse as sp
-import multiprocessing
-
-
-def ldgm(PM, sumstats, para):
-    p = para["p"]
-    h2 = para["h2"]
-    M = 0
-    beta_ldgm = []
-    for i in range(len(PM)):
-        M += len(sumstats[i]["beta"])
-    sigma2 = h2 / (M * p)
-    inv_odd_p = (1 - p) / p
-    for i in range(len(PM)):
-        beta_hat = np.array(sumstats[i]["beta"]).astype(float)
-        beta_tilde = PM[i]["precision"].dot(beta_hat)
-        m = len(beta_hat)
-        logp = np.zeros(para["ldgm_num_iter"])
-        post_p = np.random.rand(m)
-        beta_ldgm_block = np.zeros(m)
-        beta_set = np.random.multivariate_normal(
-            beta_tilde,
-            PM[i]["precision"].toarray() / para["N"],
-            size=para["ldgm_num_iter"],
-        ).T
-        logsum = 0
-        post_p = np.ones(m) * 0.5
-        for k in range(para["ldgm_num_iter"]):
-            q = np.random.rand(m)
-            q = (q < post_p).astype(int)
-            N = np.array(sumstats[i]["N"]).astype(float)
-            C1 = sigma2 * N
-            C2 = 1 / (1 + 1 / C1)
-            C3 = C2 * beta_ldgm_block
-            C4 = C2 / N
-            beta_set[:, k] = q * beta_set[:, k]
-            # post_p = 1 / (1 + inv_odd_p * np.sqrt(1 + C1) * np.exp(-C3 * C3 / C4 / 2))
-            # print(post_p)
-            rsid = np.where(beta_set[:, k] == 0)[0]
-            nrsid = np.where(beta_set[:, k] != 0)[0]
-            logp[k] = -np.dot(beta_set[nrsid, k], beta_set[nrsid, k]) / sigma2 / 2
-            print(logp[k])
-            # logp[k] += (
-            #     -(np.dot(beta_tilde[rsid], beta_tilde[rsid]) * para["N"] - len(rsid))
-            #     * 0.5
-            # )
-            # logp[k] += np.sum(np.log(post_p[rsid] / (1 - post_p[rsid]) * inv_odd_p))
-            # print(
-            #     (
-            #         -(
-            #             np.dot(beta_tilde[rsid], beta_tilde[rsid]) * para["N"]
-            #             - len(rsid)
-            #         )
-            #         * 0.5
-            #     )
-            # )
-            # print(beta_tilde[rsid])
-            # logp[k] += len(rsid) * para["N"]
-            # logp[k] += (
-            #     -np.dot(
-            #         beta_tilde[rsid],
-            #         spsolve(PM[i]["precision"][rsid][:, rsid], beta_tilde[rsid])
-            #         * N[rsid],
-            #     )
-            #     / 2
-            # )
-            # logp[k] += -np.dot(
-            #     beta_tilde[rsid],
-            #     PM[i]["precision"][rsid][:, nrsid]
-            #     @ (beta_set[nrsid, k] - beta_tilde[nrsid])
-            #     * N[rsid],
-            # )
-            if k == 0:
-                C5 = logp[k]
-                beta_ldgm_block = beta_set[:, k]
-            else:
-                if logp[k] - logsum >= 20:
-                    C5 = logp[k] - logsum
-                else:
-                    C5 = np.log(1 + np.exp(logp[k] - logsum))
-                beta_ldgm_block = beta_ldgm_block * np.exp(-C5) + beta_set[
-                    :, k
-                ] * np.exp(logp[k] - logsum - C5)
-            # print(k, beta_ldgm_block)
-            logsum += C5
-        # print(len(np.exp(logp - logsum)))
-        beta_ldgm.append(beta_ldgm_block)
-    return beta_ldgm
-
-
-# def ldgm_gibbs_block(PM, sumstats, para):
-#     p = para["p"]
-#     h2 = para["h2"]
-#     M = 0
-#     beta_ldgm = []
-#     for i in range(len(PM)):
-#         M += len(sumstats[i]["beta"])
-#     sigma2 = h2 / (M * p)
-#     for i in range(len(PM)):
-#         beta_hat = np.array(sumstats[i]["beta"]).astype(float)
-#         beta_tilde = PM[i]["precision"].dot(beta_hat)
-#         m = len(beta_hat)
-#         beta_ldgm_block = np.zeros(m)
-#         beta_set = np.zeros(m)
-#         num_beta_0 = np.ones(m)
-#         num_beta_n0 = np.ones(m)
-#         z = np.random.rand(m)
-#         z = (z < p).astype(int)
-#         for k in range(-para["ldgm_burn_in"], para["ldgm_num_iter"]):
-#             idn0 = np.where(z != 0)[0]
-#             id0 = np.where(z == 0)[0]
-#             num_beta_0[id0] += 1
-#             num_beta_n0[idn0] += 1
-#             beta_set[id0] = 0
-#             cov = np.linalg.inv(
-#                 PM[i]["LD"][idn0][:, idn0].toarray() * para["N"] + sigma2
-#             )
-#             if len(idn0) > 0:
-#                 beta_set[idn0] = np.random.multivariate_normal(
-#                     cov
-#                     @ spsolve(PM[i]["precision"][idn0][:, idn0], beta_tilde[idn0])
-#                     * para["N"],
-#                     cov,
-#                 )
-#             post_p = (num_beta_n0 * p) / (num_beta_0 * (1 - p) + num_beta_n0 * p)
-#             print(post_p)
-#             z = np.random.rand(m)
-#             z = (z < post_p).astype(int)
-#             if k >= 0:
-#                 beta_ldgm_block += beta_set
-#         beta_ldgm.append(beta_ldgm_block / para["ldgm_num_iter"])
-#     return beta_ldgm
-
-
-def ldgm_gibbs_block(PM, sumstats, para):
-    p = para["p"]
-    h2 = para["h2"]
-    M = 0
-    beta_ldgm = []
-    for i in range(len(PM)):
-        M += len(sumstats[i]["beta"])
-    h2_per_var = h2 / (M * p)
-    inv_odd_p = (1 - p) / p
-    for i in range(len(PM)):
-        beta_hat = np.array(sumstats[i]["beta"]).astype(float)
-        beta_tilde = PM[i]["precision"].dot(beta_hat)
-        N = np.array(sumstats[i]["N"]).astype(float)
-        P = PM[i]["precision"].copy()
-        P.setdiag(0)
-        m = len(beta_hat)
-        curr_beta = np.zeros(m)
-        avg_beta = np.zeros(m)
-        for k in range(-para["ldgm_burn_in"], para["ldgm_num_iter"]):
-            res_beta_hat = beta_hat - (PM[i]["LD"].dot(curr_beta) - curr_beta)
-            # res_beta_hat = beta_tilde
-            # res_beta_hat = beta_tilde - P.dot(curr_beta)
-            C1 = h2_per_var * N
-            C2 = 1 / (1 + 1 / C1)
-            C3 = C2 * res_beta_hat
-            C4 = C2 / N
-            post_p = 1 / (1 + inv_odd_p * np.sqrt(1 + C1) * np.exp(-C3 * C3 / C4 / 2))
-            q = np.random.rand(m)
-            q = (q < post_p).astype(int)
-            id0 = np.where(q == 0)[0]
-            idn0 = np.where(q == 1)[0]
-            curr_beta[id0] = 0
-            curr_beta[idn0] = (np.random.randn(len(idn0)) + C3[idn0]) * np.sqrt(
-                C4[idn0]
-            )
-            if k >= 0:
-                avg_beta += C3 * post_p
-        beta_ldgm.append(avg_beta / para["ldgm_num_iter"])
-    return beta_ldgm
+from mpi4py import MPI
 
 
 def ldgm_R_times(P, x, Pidn0):
@@ -276,6 +105,12 @@ def ldgm_gibbs_block_auto(PM, snplist, sumstats, para):
 
 
 def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if rank != 0:
+        subinput = comm.recv(source=0)
+    if isinstance(subinput, str):
+        return 0
     (
         PM,
         snplist,
@@ -315,9 +150,9 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
             snplist["index"],
         )
         curr_beta[idn0] = np.random.randn(len(idn0))
-        x1 = ldgm_R_times(P, curr_beta[idn0], Pidn0) * C1
-        x2 = ldgm_R_times(P, x1, Pidn0) * C1
-        x3 = ldgm_R_times(P, x2, Pidn0) * C1
+        x1 = ldgm_R_times(P, curr_beta[idn0], Pidn0) * C1[idn0]
+        x2 = ldgm_R_times(P, x1, Pidn0) * C1[idn0]
+        x3 = ldgm_R_times(P, x2, Pidn0) * C1[idn0]
         # x3 = np.zeros(len(idn0))
         curr_beta[idn0] = curr_beta[idn0] - x1 / 2 - x2 / 8 - x3 / 16
         curr_beta[idn0] *= np.sqrt(h2_per_var)
@@ -325,12 +160,24 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
         mean_beta[idn0] = mean[idn0]
     curr_beta[id0] = 0
     R_curr_beta = ldgm_R_times(PM["precision"], curr_beta, snplist["index"])
+    if rank != 0:
+        comm.send(
+            (
+                curr_beta,
+                R_curr_beta,
+                len(idn0),
+                np.dot(curr_beta, R_curr_beta),
+                mean_beta,
+            ),
+            dest=0,
+        )
+        return 1
     return curr_beta, R_curr_beta, len(idn0), np.dot(curr_beta, R_curr_beta), mean_beta
 
 
 def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
-    num_processes = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(processes=num_processes)
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
     p = para["p"]
     p = np.random.rand()
     h2 = para["h2"]
@@ -360,24 +207,32 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
         h2_per_var = h2 / (M * p)
         inv_odd_p = (1 - p) / p
         h2 = 0
-        subinput = []
+        results = []
         for i in range(len(PM)):
-            subinput.append(
-                (
-                    PM[i],
-                    snplist[i],
-                    beta_hat[i],
-                    curr_beta[i],
-                    R_curr_beta[i],
-                    N[i],
-                    h2_per_var,
-                    inv_odd_p,
-                    para,
-                    i,
-                    k,
-                )
+            subinput = (
+                PM[i],
+                snplist[i],
+                beta_hat[i],
+                curr_beta[i],
+                R_curr_beta[i],
+                N[i],
+                h2_per_var,
+                inv_odd_p,
+                para,
+                i,
+                k,
             )
-        results = pool.map(ldgm_gibbs_block_auto_parallel_subprocess, subinput)
+            if i % size == size - 1:
+                result0 = ldgm_gibbs_block_auto_parallel_subprocess(subinput)
+                for i in range(1, size):
+                    results.append(comm.recv(source=i))
+                results.append(result0)
+            else:
+                dest = i % size + 1
+                comm.send(subinput, dest=dest)
+        if len(PM) % size != 0:
+            for i in range(1, len(PM) % size + 1):
+                results.append(comm.recv(source=i))
         for i in range(len(PM)):
             curr_beta[i], R_curr_beta[i], Mc_add, h2_add, mean_beta = results[i]
             Mc += Mc_add
@@ -388,4 +243,6 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
     for i in range(len(PM)):
         beta_ldgm.append(avg_beta[i] / para["ldgm_num_iter"])
         snplist[i]["index"] = snplist[i]["index"].tolist()
+    for i in range(1, size):
+        comm.send("done", dest=i)
     return beta_ldgm

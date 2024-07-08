@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-import multiprocessing
+from mpi4py import MPI
 
 
 def filter_by_PM(PM, snplist):
@@ -15,22 +15,43 @@ def filter_by_PM(PM, snplist):
         snplist[i]["index"] = np.arange(len(snplist[i]["rsid"])).tolist()
 
 
-def normalize_PM_subprocess(subinput):
+def normalize_PM_parallel_subprocess(subinput):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if rank != 0:
+        subinput = comm.recv(source=0)
+    if isinstance(subinput, str):
+        return 0
     P, i = subinput
     print("normalize_PM_subprocess block:", i)
     D = np.sqrt(sp.linalg.inv(P.tocsc()).diagonal())
+    if rank != 0:
+        comm.send(P.multiply(np.outer(D, D)).tocsr(), dest=0)
+        return 1
     return P.multiply(np.outer(D, D)).tocsr()
 
 
-def normalize_PM(PM):
-    num_processes = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(processes=num_processes)
-    subinput = []
+def normalize_PM_parallel(PM):
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    results = []
     for i in range(len(PM)):
-        subinput.append((PM[i]["precision"], i))
-    results = pool.map(normalize_PM_subprocess, subinput)
+        subinput = (PM[i]["precision"], i)
+        if i % size == size - 1:
+            result0 = normalize_PM_parallel_subprocess(subinput)
+            for i in range(1, size):
+                results.append(comm.recv(source=i))
+            results.append(result0)
+        else:
+            dest = i % size + 1
+            comm.send(subinput, dest=dest)
+    if len(PM) % size != 0:
+        for i in range(1, len(PM) % size + 1):
+            results.append(comm.recv(source=i))
     for i in range(len(PM)):
         PM[i]["precision"] = results[i]
+    for i in range(1, size):
+        comm.send("done", dest=i)
 
 
 def normalize_dense_matrix(A):
@@ -39,8 +60,14 @@ def normalize_dense_matrix(A):
     return A / sqrt_diag_outer
 
 
-def fliter_by_sumstats_subprocess(subinput):
-    rsid_sumstats, snplist_rsid, i = subinput
+def fliter_by_sumstats_parallel_subprocess(rsid_sumstats, subinput):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if rank != 0:
+        subinput = comm.recv(source=0)
+    if isinstance(subinput, str):
+        return 0
+    snplist_rsid, i = subinput
     rsid1 = [
         index for index, value in enumerate(snplist_rsid) if value in rsid_sumstats
     ]
@@ -50,22 +77,37 @@ def fliter_by_sumstats_subprocess(subinput):
         if value in rsid_sumstats
     ]
     print("Fliter_by_sumstats parallel block:", i)
+    if rank != 0:
+        comm.send((rsid1, rsid2), dest=0)
+        return 1
     return rsid1, rsid2
 
 
-def fliter_by_sumstats_parallel(PM, snplist, sumstats):
+def fliter_by_sumstats_parallel(snplist, sumstats):
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
     sumstats_set = []
     rsid_sumstats = {value: index for index, value in enumerate(sumstats["rsid"])}
-    num_processes = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(processes=num_processes)
+    rsid_sumstats = comm.bcast(rsid_sumstats, root=0)
     subinput = []
-    for i in range(len(PM)):
-        subinput.append((rsid_sumstats, snplist[i]["rsid"], i))
+    results = []
+    for i in range(len(snplist)):
+        subinput = (snplist[i]["rsid"], i)
+        if i % size == size - 1:
+            result0 = fliter_by_sumstats_parallel_subprocess(rsid_sumstats, subinput)
+            for i in range(1, size):
+                results.append(comm.recv(source=i))
+            results.append(result0)
+        else:
+            dest = i % size + 1
+            comm.send(subinput, dest=dest)
+    if len(snplist) % size != 0:
+        for i in range(1, len(snplist) % size + 1):
+            results.append(comm.recv(source=i))
     for key in list(sumstats.keys()):
         if isinstance(sumstats[key], list):
             sumstats[key] = np.array(sumstats[key])
-    results = pool.map(fliter_by_sumstats_subprocess, subinput)
-    for i in range(len(PM)):
+    for i in range(len(snplist)):
         rsid1, rsid2 = results[i]
         for key in list(snplist[i].keys()):
             if isinstance(snplist[i][key], list):
@@ -76,6 +118,8 @@ def fliter_by_sumstats_parallel(PM, snplist, sumstats):
                 sumstats_block[key] = sumstats[key][rsid2].tolist()
         sumstats_set.append(sumstats_block)
         print("Fliter_by_sumstats results block:", i)
+    for i in range(1, size):
+        comm.send("done", dest=i)
     return sumstats_set
 
 

@@ -71,12 +71,12 @@ def get_para():
     para["p"] = 0.018
     para["block_size"] = 100
     para["PM_size"] = para["block_size"]
-    para["block_num"] = 10
+    para["block_num"] = 20
     para["burn_in"] = 50
     para["num_iter"] = 100
     para["N"] = 15155
-    para["ldgm_burn_in"] = 200
-    para["ldgm_num_iter"] = 1000
+    para["ldgm_burn_in"] = 50
+    para["ldgm_num_iter"] = 100
     para["h2_min"] = 0.1
     para["h2_max"] = 0.9
     return para
