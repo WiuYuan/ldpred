@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.sparse.linalg import splu
 import scipy.sparse as sp
-import multiprocessing
+from joblib import Parallel, delayed
 
 
 def ldgm(PM, sumstats, para):
@@ -329,8 +329,6 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
 
 
 def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
-    num_processes = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(processes=num_processes)
     p = para["p"]
     p = np.random.rand()
     h2 = para["h2"]
@@ -377,7 +375,9 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
                     k,
                 )
             )
-        results = pool.map(ldgm_gibbs_block_auto_parallel_subprocess, subinput)
+        results = Parallel(n_jobs=-1)(
+            delayed(ldgm_gibbs_block_auto_parallel_subprocess)(d) for d in subinput
+        )
         for i in range(len(PM)):
             curr_beta[i], R_curr_beta[i], Mc_add, h2_add, mean_beta = results[i]
             Mc += Mc_add

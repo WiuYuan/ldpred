@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-import multiprocessing
+from joblib import Parallel, delayed
 
 
 def filter_by_PM(PM, snplist):
@@ -23,12 +23,10 @@ def normalize_PM_subprocess(subinput):
 
 
 def normalize_PM(PM):
-    num_processes = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(processes=num_processes)
     subinput = []
     for i in range(len(PM)):
         subinput.append((PM[i]["precision"], i))
-    results = pool.map(normalize_PM_subprocess, subinput)
+    results = Parallel(n_jobs=-1)(delayed(normalize_PM_subprocess)(d) for d in subinput)
     for i in range(len(PM)):
         PM[i]["precision"] = results[i]
 
@@ -56,15 +54,15 @@ def fliter_by_sumstats_subprocess(subinput):
 def fliter_by_sumstats_parallel(PM, snplist, sumstats):
     sumstats_set = []
     rsid_sumstats = {value: index for index, value in enumerate(sumstats["rsid"])}
-    num_processes = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(processes=num_processes)
     subinput = []
     for i in range(len(PM)):
         subinput.append((rsid_sumstats, snplist[i]["rsid"], i))
     for key in list(sumstats.keys()):
         if isinstance(sumstats[key], list):
             sumstats[key] = np.array(sumstats[key])
-    results = pool.map(fliter_by_sumstats_subprocess, subinput)
+    results = Parallel(n_jobs=-1)(
+        delayed(fliter_by_sumstats_subprocess)(d) for d in subinput
+    )
     for i in range(len(PM)):
         rsid1, rsid2 = results[i]
         for key in list(snplist[i].keys()):
