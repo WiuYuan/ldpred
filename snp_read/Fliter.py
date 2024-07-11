@@ -47,6 +47,9 @@ def fliter_by_sumstats_subprocess(subinput):
         for index, value in enumerate(snplist_rsid)
         if value in rsid_sumstats
     ]
+    # snplist_rsid_fliter = np.array(snplist_rsid)[rsid1].tolist()
+    # rsid_sumstats_fliter = np.array(rsid_sumstats)[rsid2].tolist()
+    # rsid1 = [snplist_rsid_fliter.index(x) for x in rsid_sumstats_fliter]
     print("Fliter_by_sumstats parallel block:", i)
     return rsid1, rsid2
 
@@ -60,7 +63,7 @@ def fliter_by_sumstats_parallel(PM, snplist, sumstats):
     for key in list(sumstats.keys()):
         if isinstance(sumstats[key], list):
             sumstats[key] = np.array(sumstats[key])
-    results = Parallel(n_jobs=-1)(
+    results = Parallel(n_jobs=-1, backend="threading")(
         delayed(fliter_by_sumstats_subprocess)(d) for d in subinput
     )
     for i in range(len(PM)):
@@ -75,6 +78,18 @@ def fliter_by_sumstats_parallel(PM, snplist, sumstats):
         sumstats_set.append(sumstats_block)
         print("Fliter_by_sumstats results block:", i)
     return sumstats_set
+
+
+def fliter_by_unique_sumstats(sumstats):
+    unique_indices = set()
+    unique_indices = [
+        unique_indices.add(x) or i
+        for i, x in enumerate(sumstats["rsid"])
+        if x not in unique_indices
+    ]
+    for key in sumstats.keys():
+        if isinstance(sumstats[key], list):
+            sumstats[key] = np.array(sumstats[key])[unique_indices].tolist()
 
 
 def fliter_by_sumstats(PM, snplist, sumstats):

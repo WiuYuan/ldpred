@@ -105,16 +105,16 @@ def sumstats_read(sumstats_path):
             else:
                 for i in range(len(title_list)):
                     sumstats[title_list[i]].append(line_list[i])
-                if sumstats["A1"][tot - 1] == sumstats["REF"][tot - 1]:
-                    sumstats["ALT"].append(sumstats["A2"][tot - 1])
-                else:
-                    sumstats["ALT"].append(sumstats["A1"][tot - 1])
+                # if sumstats["A1"][tot - 1] == sumstats["REF"][tot - 1]:
+                #     sumstats["ALT"].append(sumstats["A2"][tot - 1])
+                # else:
+                #     sumstats["ALT"].append(sumstats["A1"][tot - 1])
             tot = tot + 1
             if tot % 100000 == 0:
                 print("Read sumstats line:", tot)
-    sumstats["rsid"] = sumstats.pop("SNP")
-    sumstats["beta"] = sumstats.pop("Beta")
-    sumstats["beta_se"] = sumstats.pop("se")
+    # sumstats["rsid"] = sumstats.pop("SNP")
+    # sumstats["beta"] = sumstats.pop("Beta")
+    # sumstats["beta_se"] = sumstats.pop("se")
     return sumstats
 
 

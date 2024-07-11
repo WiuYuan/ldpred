@@ -10,7 +10,7 @@ def get_marginal_beta(sumstats):
     return beta_marginal
 
 
-def ldpred2_inf(PM, sumstats, para):
+def ldpred2_inf(PM, snplist, sumstats, para):
     beta_inf_set = []
     m = 0
     for i in range(len(sumstats)):
@@ -25,7 +25,7 @@ def ldpred2_inf(PM, sumstats, para):
         # scale = np.sqrt(N * beta_se**2 + beta**2)
         scale = 1
         beta_hat = beta / scale
-        LD = PM[i]["LD"]
+        LD = PM[i]["LD"][snplist[i]["index"]][:, snplist[i]["index"]]
         LD += eye(LD.shape[0], format="csr") * (m / (para["h2"] * para["N"]))
         beta_inf = spsolve(LD, beta_hat)
         beta_inf_set.append(beta_inf * scale)
@@ -89,7 +89,7 @@ def ldpred2_grid(PM, sumstats, para):
     return beta_gibbs_set
 
 
-def ldpred2_auto(PM, sumstats, para):
+def ldpred2_auto(PM, snplist, sumstats, para):
     p = np.random.rand()
     h2 = np.random.rand()
     curr_beta = []
@@ -114,13 +114,12 @@ def ldpred2_auto(PM, sumstats, para):
                 continue
             N = np.array(sumstats[i]["N"]).astype(float)
             beta_hat = np.array(sumstats[i]["beta"]).astype(float)
-            LD = PM[i]["LD"]
+            LD = PM[i]["LD"][snplist[i]["index"]][:, snplist[i]["index"]]
             if isinstance(LD[0], np.float64):
                 LD = csr_matrix([[LD[0]]])
             m = len(beta_hat)
             for j in range(m):
                 res_beta_hat_j = beta_hat[j] - (dotprods[i][j] - curr_beta[i][j])
-                # res_beta_hat_j = beta_hat[j] - dotprods[j]
                 C1 = h2_per_var * N[j]
                 C2 = 1 / (1 + 1 / C1)
                 C3 = C2 * res_beta_hat_j

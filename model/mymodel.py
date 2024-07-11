@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import gmres, spsolve
 from scipy.sparse.linalg import splu
 import scipy.sparse as sp
 from joblib import Parallel, delayed
@@ -182,7 +182,8 @@ def ldgm_R_times(P, x, Pidn0):
     else:
         y = np.zeros(P.shape[0])
         y[Pidn0] = x
-        return spsolve(P, y)[Pidn0]
+        # return spsolve(P, y)[Pidn0]
+        return gmres(P, y, rtol=1e-8)[0][Pidn0]
 
 
 def ldgm_P_times(P, x, Pidn0):
@@ -190,8 +191,11 @@ def ldgm_P_times(P, x, Pidn0):
     if len(Pid0) == 0:
         return P[Pidn0][:, Pidn0].dot(x)
     else:
+        # return P[Pidn0][:, Pidn0].dot(x) - P[Pidn0][:, Pid0].dot(
+        #     spsolve(P[Pid0][:, Pid0], P[Pid0][:, Pidn0].dot(x))
+        # )
         return P[Pidn0][:, Pidn0].dot(x) - P[Pidn0][:, Pid0].dot(
-            spsolve(P[Pid0][:, Pid0], P[Pid0][:, Pidn0].dot(x))
+            gmres(P[Pid0][:, Pid0], P[Pid0][:, Pidn0].dot(x), rtol=1e-8)[0]
         )
 
 
@@ -285,11 +289,13 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
         N,
         h2_per_var,
         inv_odd_p,
+        h2,
         para,
         i,
         k,
     ) = subinput
-    print("Run ldgm_gibbs_block_auto block:", i, "Iteration:", k)
+    if i % 137 == 0:
+        print("Run ldgm_gibbs_block_auto block:", i, "Iteration:", k)
     res_beta_hat = beta_hat - (R_curr_beta - curr_beta)
     C1 = h2_per_var * N
     C2 = 1 / (1 + 1 / C1)
@@ -297,6 +303,7 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
     C4 = C2 / N
     m = len(beta_hat)
     post_p = 1 / (1 + inv_odd_p * np.sqrt(1 + C1) * np.exp(-C3 * C3 / C4 / 2))
+    C1 = C1 / (1 - h2)
     q = np.random.rand(m)
     q = (q < post_p).astype(int)
     id0 = np.where(q == 0)[0]
@@ -310,16 +317,22 @@ def ldgm_gibbs_block_auto_parallel_subprocess(subinput):
         P[Pidn0, Pidn0] += C1[idn0]
         mean = ldgm_R_times(
             P,
-            C1
-            * (ldgm_P_times(P, beta_hat_copy, snplist["index"]) - C1 * beta_hat_copy),
+            C1 * (ldgm_P_times(PM["precision"], beta_hat_copy, snplist["index"])),
             snplist["index"],
         )
+        # mean = ldgm_R_times(
+        #     P,
+        #     C1
+        #     * (ldgm_P_times(P, beta_hat_copy, snplist["index"]) - C1 * beta_hat_copy),
+        #     snplist["index"],
+        # )
         curr_beta[idn0] = np.random.randn(len(idn0))
-        x1 = ldgm_R_times(P, curr_beta[idn0], Pidn0) * C1[idn0]
-        x2 = ldgm_R_times(P, x1, Pidn0) * C1[idn0]
-        x3 = ldgm_R_times(P, x2, Pidn0) * C1[idn0]
-        # x3 = np.zeros(len(idn0))
-        curr_beta[idn0] = curr_beta[idn0] - x1 / 2 - x2 / 8 - x3 / 16
+        x = curr_beta[idn0]
+        coef = 1
+        for l in range(1, para["taylor_num"] + 1):
+            x = ldgm_R_times(P, x, Pidn0) * C1[idn0]
+            coef *= -(0.5 - l + 1) / l
+            curr_beta[idn0] += coef * x
         curr_beta[idn0] *= np.sqrt(h2_per_var)
         curr_beta[idn0] += mean[idn0]
         mean_beta[idn0] = mean[idn0]
@@ -354,10 +367,11 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
         print("step:", k, "p:", p, "h2:", h2)
         h2 = max(h2, para["h2_min"])
         h2 = min(h2, para["h2_max"])
+        p = max(h2, para["p_min"])
+        p = min(h2, para["p_max"])
         Mc = 0
         h2_per_var = h2 / (M * p)
         inv_odd_p = (1 - p) / p
-        h2 = 0
         subinput = []
         for i in range(len(PM)):
             subinput.append(
@@ -370,12 +384,14 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
                     N[i],
                     h2_per_var,
                     inv_odd_p,
+                    h2,
                     para,
                     i,
                     k,
                 )
             )
-        results = Parallel(n_jobs=-1)(
+        h2 = 0
+        results = Parallel(n_jobs=14)(
             delayed(ldgm_gibbs_block_auto_parallel_subprocess)(d) for d in subinput
         )
         for i in range(len(PM)):
@@ -388,4 +404,4 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
     for i in range(len(PM)):
         beta_ldgm.append(avg_beta[i] / para["ldgm_num_iter"])
         snplist[i]["index"] = snplist[i]["index"].tolist()
-    return beta_ldgm
+    return beta_ldgm, p, h2
