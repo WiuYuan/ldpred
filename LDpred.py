@@ -5,5 +5,4 @@ from model import LDpred2
 from model import predict
 from simulation import generate
 from model import mymodel
-from model import ldgm
 from snp_read import Check
