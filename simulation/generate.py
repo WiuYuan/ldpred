@@ -14,8 +14,8 @@ def generate_sumstats_beta(PM, snplist, para):
         sumstats_block = {}
         mm = para["sumstats_block_size"]
         sumstats_block["N"] = np.ones(mm) * para["N"]
-        sumstats_block["beta_se"] = np.ones(mm) * np.sqrt(sigma)
-        sumstats_block["rsid"] = ["rs{}".format(i) for i in range(si, si + mm)]
+        sumstats_block["beta_se"] = np.ones(mm) / np.sqrt(para["N"])
+        sumstats_block["rsid"] = np.array(snplist[i]["rsid"])[0:mm].tolist()
         si += para["PM_size"]
         beta_true.append([])
         if mm == 0:
@@ -79,9 +79,9 @@ def get_para():
     para["block_num"] = 10
     para["burn_in"] = 50
     para["num_iter"] = 100
-    para["N"] = 800
-    para["ldgm_burn_in"] = 50
-    para["ldgm_num_iter"] = 100
+    para["N"] = 150
+    para["ldgm_burn_in"] = 200
+    para["ldgm_num_iter"] = 1000
     para["taylor_num"] = 10
     para["h2_min"] = 0.001
     para["h2_max"] = 0.999

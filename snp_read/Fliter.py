@@ -18,7 +18,14 @@ def filter_by_PM(PM, snplist):
 def normalize_PM_subprocess(subinput):
     P, i = subinput
     print("normalize_PM_subprocess block:", i)
-    D = np.sqrt(sp.linalg.inv(P.tocsc()).diagonal())
+    D = np.sqrt(
+        sp.linalg.spsolve(P.tocsc(), sp.eye(P.shape[0], format="csc")).diagonal()
+    )
+    # nP = sp.linalg.inv(P.tocsc())
+    # D = np.sqrt(nP.diagonal())
+    # DD = np.outer(D, D)
+    # if np.all(nP < DD * 1.00000001) == 0:
+    #     raise Exception("The LD matrix is not a correlation matrix!")
     return P.multiply(np.outer(D, D)).tocsr()
 
 
@@ -50,7 +57,8 @@ def fliter_by_sumstats_subprocess(subinput):
     # snplist_rsid_fliter = np.array(snplist_rsid)[rsid1].tolist()
     # rsid_sumstats_fliter = np.array(rsid_sumstats)[rsid2].tolist()
     # rsid1 = [snplist_rsid_fliter.index(x) for x in rsid_sumstats_fliter]
-    print("Fliter_by_sumstats parallel block:", i)
+    if i % 137 == 0:
+        print("Fliter_by_sumstats parallel block:", i)
     return rsid1, rsid2
 
 

@@ -15,8 +15,10 @@ if __name__ == "__main__":
     beta_ldgm_total = ld.Fliter.merge_beta(beta_ldgm)
     beta_auto = ld.LDpred2.ldpred2_auto(PM, snplist, sumstats, para)
     beta_auto_total = ld.Fliter.merge_beta(beta_auto)
-    beta_auto2 = ld.LDpred2.ldpred2_auto(PM, snplist, sumstats, para)
-    beta_auto2_total = ld.Fliter.merge_beta(beta_auto2)
+    beta_ldgm_grid = ld.mymodel.ldgm_gibbs_block_grid_parallel(
+        PM, snplist, sumstats, para
+    )
+    beta_ldgm_grid_total = ld.Fliter.merge_beta(beta_ldgm_grid)
     beta_inf = ld.LDpred2.ldpred2_inf(PM, snplist, sumstats, para)
     beta_inf_total = ld.Fliter.merge_beta(beta_inf)
     print(
@@ -24,10 +26,10 @@ if __name__ == "__main__":
         ld.predict.check_r_squared_beta(beta_inf_total, beta_true_total),
         "ldgm_auto r2:",
         ld.predict.check_r_squared_beta(beta_ldgm_total, beta_true_total),
+        "ldgm_grid r2:",
+        ld.predict.check_r_squared_beta(beta_ldgm_grid_total, beta_true_total),
         "auto r2:",
         ld.predict.check_r_squared_beta(beta_auto_total, beta_true_total),
-        "auto r2:",
-        ld.predict.check_r_squared_beta(beta_auto2_total, beta_true_total),
     )
     end_time = time.time()
     ld.Write.sumstats_beta_write(
