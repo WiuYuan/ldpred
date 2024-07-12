@@ -278,7 +278,7 @@ def ldgm_gibbs_block_auto_parallel(PM, snplist, sumstats, para):
                 )
             )
         h2 = 0
-        results = Parallel(n_jobs=14)(
+        results = Parallel(n_jobs=-1)(
             delayed(ldgm_gibbs_block_auto_parallel_subprocess)(d) for d in subinput
         )
         for i in range(len(PM)):
